@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Target, Swords, Shield, Flame, Settings, Sparkles, Brain, Bolt, Users, User, Zap, Trophy } from 'lucide-react';
 
 const Calc3PvPGame = () => {
+  // All state declarations at the top
   const [gameState, setGameState] = useState('menu');
   const [playerHP, setPlayerHP] = useState(100);
   const [maxPlayerHP, setMaxPlayerHP] = useState(100);
@@ -24,12 +25,14 @@ const Calc3PvPGame = () => {
   const [playerClass, setPlayerClass] = useState(null);
   const [showClassSelect, setShowClassSelect] = useState(false);
   const [energy, setEnergy] = useState(3);
-  const [maxEnergy] = useState(3);
   const [abilityOnCooldown, setAbilityOnCooldown] = useState(false);
   const [currentTurn, setCurrentTurn] = useState('player');
   const [shield, setShield] = useState(0);
   const [enemyNextMove, setEnemyNextMove] = useState(null);
   const [questionStreak, setQuestionStreak] = useState(0);
+  const [enemyClass, setEnemyClass] = useState(null);
+
+  const maxEnergy = 3;
 
   const classes = {
     warrior: {
@@ -39,11 +42,7 @@ const Calc3PvPGame = () => {
       description: 'High damage, defensive expert',
       bonusDamage: 10,
       damageReduction: 0.75,
-      ability: {
-        name: 'Shield Wall',
-        description: 'Gain 30 shield points',
-        cost: 2
-      }
+      ability: { name: 'Shield Wall', description: 'Gain 30 shield points', cost: 2 }
     },
     mage: {
       name: 'Mage',
@@ -52,11 +51,7 @@ const Calc3PvPGame = () => {
       description: 'Time and energy master',
       bonusDamage: 5,
       damageReduction: 1.0,
-      ability: {
-        name: 'Arcane Surge',
-        description: 'Deal 35 damage',
-        cost: 2
-      }
+      ability: { name: 'Arcane Surge', description: 'Deal 35 damage', cost: 2 }
     },
     rogue: {
       name: 'Rogue',
@@ -65,11 +60,7 @@ const Calc3PvPGame = () => {
       description: 'Speed and combo specialist',
       bonusDamage: 15,
       damageReduction: 1.0,
-      ability: {
-        name: 'Perfect Strike',
-        description: 'Guarantee next answer',
-        cost: 3
-      }
+      ability: { name: 'Perfect Strike', description: 'Guarantee next answer', cost: 3 }
     },
     scholar: {
       name: 'Scholar',
@@ -78,15 +69,11 @@ const Calc3PvPGame = () => {
       description: 'Balanced sustain build',
       bonusDamage: 8,
       damageReduction: 0.85,
-      ability: {
-        name: 'Focus',
-        description: 'Heal 35 HP',
-        cost: 2
-      }
+      ability: { name: 'Focus', description: 'Heal 35 HP', cost: 2 }
     }
   };
 
-  const generateQuestion = useCallback(() => {
+  const generateQuestion = () => {
     const topics = ['functions', 'limits', 'partials'];
     const topic = topics[Math.floor(Math.random() * topics.length)];
     
@@ -3102,46 +3089,32 @@ const Calc3PvPGame = () => {
     const pool = questions[topic];
     const q = pool[Math.floor(Math.random() * pool.length)];
     return { ...q, topic, options: [...q.opts].sort(() => Math.random() - 0.5) };
-  }, []);
+  };
 
-  const calculateEnemyMove = useCallback(() => {
-    const baseAcc = 0.50 + (round * 0.03);
-    const penalty = Math.min(questionStreak * 0.05, 0.15);
-    const finalAcc = Math.max(0.50, Math.min(0.85, baseAcc - penalty));
+  const calculateEnemyMove = (currentRound, currentStreak, currentEnemyClass) => {
+    const baseAcc = 0.50 + (currentRound * 0.05);
+    const penalty = Math.min(currentStreak * 0.05, 0.15);
+    const finalAcc = Math.max(0.50, Math.min(0.90, baseAcc - penalty));
     const willSucceed = Math.random() < finalAcc;
-    // Always show a damage value even if they'll miss (for bluffing)
-    const displayDamage = 18 + Math.floor(Math.random() * 8);
+    const baseDamage = 20 + (currentRound * 3);
+    const enemyBonus = currentEnemyClass ? classes[currentEnemyClass].bonusDamage : 0;
+    const displayDamage = baseDamage + enemyBonus + Math.floor(Math.random() * 8);
     return { 
       willSucceed, 
       damage: willSucceed ? displayDamage : 0,
-      displayDamage, // What the player sees
+      displayDamage,
       accuracy: Math.round(finalAcc * 100)
     };
-  }, [round, questionStreak]);
+  };
 
-  const newQuestion = useCallback(() => {
+  const newQuestion = () => {
     setCurrentQuestion(generateQuestion());
     setTimeLeft(maxTime);
     setSelectedAnswer(null);
     setFeedback('');
     setCurrentTurn('player');
-    setEnemyNextMove(calculateEnemyMove());
-  }, [generateQuestion, maxTime, calculateEnemyMove]);
-
-  useEffect(() => {
-    if (gameState === 'playing' && playerClass) {
-      newQuestion();
-    }
-  }, [gameState, playerClass]);
-
-  useEffect(() => {
-    if (gameState === 'playing' && timeLeft > 0 && !selectedAnswer && currentTurn === 'player') {
-      const timer = setTimeout(() => setTimeLeft(t => t - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && gameState === 'playing' && !selectedAnswer && currentTurn === 'player') {
-      handleTimeout();
-    }
-  }, [gameState, timeLeft, selectedAnswer, currentTurn]);
+    setEnemyNextMove(calculateEnemyMove(round, questionStreak, enemyClass));
+  };
 
   const addLog = (msg) => {
     setBattleLog([{ msg, id: Date.now() }]);
@@ -3162,6 +3135,116 @@ const Calc3PvPGame = () => {
     return { newHP, actualDamage: dmg };
   };
 
+  const nextRound = () => {
+    addLog('Victory!');
+    const nextRoundNum = round + 1;
+    setRound(nextRoundNum);
+    
+    if (nextRoundNum >= 3) {
+      const classKeys = Object.keys(classes);
+      const randomClass = classKeys[Math.floor(Math.random() * classKeys.length)];
+      setEnemyClass(randomClass);
+    }
+    
+    setTimeout(() => {
+      const newMaxEnemy = 100 + (round * 20);
+      setMaxEnemyHP(newMaxEnemy);
+      setEnemyHP(newMaxEnemy);
+      // Player max HP stays the same, only heal
+      setPlayerHP(Math.min(maxPlayerHP, playerHP + 50));
+      setEnergy(maxEnergy);
+      setShield(0);
+      setQuestionStreak(0);
+      setBattleLog([]);
+      newQuestion();
+    }, 2000);
+  };
+
+  const enemyAttack = () => {
+    setCurrentTurn('enemy');
+    setEnemyThinking(true);
+    
+    // Check if enemy will use ability (30% chance if they have a class and round >= 3)
+    const willUseAbility = enemyClass && Math.random() < 0.3;
+    
+    setTimeout(() => {
+      setEnemyThinking(false);
+      
+      if (willUseAbility) {
+        // Enemy uses their class ability
+        if (enemyClass === 'warrior') {
+          addLog('Enemy uses Shield Wall!');
+          setEnemyAnimation('heal');
+          setTimeout(() => {
+            setEnemyAnimation('');
+            newQuestion();
+          }, 1000);
+        } else if (enemyClass === 'mage') {
+          const result = applyDamage(35, true);
+          addLog(`Enemy Arcane Surge! ${result.actualDamage} damage!`);
+          setEnemyAnimation('attack');
+          setPlayerAnimation('shake');
+          setTimeout(() => {
+            setPlayerAnimation('');
+            setEnemyAnimation('');
+            if (result.newHP <= 0) {
+              setGameState('defeat');
+            } else {
+              newQuestion();
+            }
+          }, 1000);
+        } else if (enemyClass === 'rogue') {
+          addLog('Enemy prepares Perfect Strike!');
+          setEnemyAnimation('heal');
+          setTimeout(() => {
+            setEnemyAnimation('');
+            newQuestion();
+          }, 1000);
+        } else if (enemyClass === 'scholar') {
+          const healAmount = 35;
+          setEnemyHP(hp => Math.min(maxEnemyHP, hp + healAmount));
+          addLog(`Enemy heals ${healAmount} HP!`);
+          setEnemyAnimation('heal');
+          setTimeout(() => {
+            setEnemyAnimation('');
+            newQuestion();
+          }, 1000);
+        }
+      } else {
+        // Normal attack
+        if (enemyNextMove && enemyNextMove.willSucceed) {
+          const result = applyDamage(enemyNextMove.damage, true);
+          addLog(`Enemy: ${result.actualDamage} damage!`);
+          setEnemyAnimation('attack');
+          setPlayerAnimation('shake');
+          setTimeout(() => {
+            setPlayerAnimation('');
+            setEnemyAnimation('');
+            if (result.newHP <= 0) {
+              setGameState('defeat');
+            } else {
+              setQuestionStreak(0);
+              newQuestion();
+            }
+          }, 1000);
+        } else {
+          const result = applyDamage(8, false);
+          addLog('Enemy missed!');
+          setEnemyAnimation('shake');
+          setTimeout(() => {
+            setEnemyAnimation('');
+            if (result.newHP <= 0) {
+              nextRound();
+            } else {
+              setQuestionStreak(0);
+              newQuestion();
+            }
+          }, 1000);
+        }
+      }
+    }, 2000);
+  };
+
   const handleTimeout = () => {
     const result = applyDamage(15, true);
     addLog(`Time up! ${result.actualDamage} damage!`);
@@ -3174,43 +3257,6 @@ const Calc3PvPGame = () => {
         enemyAttack();
       }
     }, 1000);
-  };
-
-  const enemyAttack = () => {
-    setCurrentTurn('enemy');
-    setEnemyThinking(true);
-    setTimeout(() => {
-      setEnemyThinking(false);
-      if (enemyNextMove.willSucceed) {
-        const result = applyDamage(enemyNextMove.damage, true);
-        addLog(`Enemy: ${result.actualDamage} damage!`);
-        setEnemyAnimation('attack');
-        setPlayerAnimation('shake');
-        setTimeout(() => {
-          setPlayerAnimation('');
-          setEnemyAnimation('');
-          if (result.newHP <= 0) {
-            setGameState('defeat');
-          } else {
-            setQuestionStreak(0);
-            newQuestion();
-          }
-        }, 1000);
-      } else {
-        const result = applyDamage(8, false);
-        addLog('Enemy missed!');
-        setEnemyAnimation('shake');
-        setTimeout(() => {
-          setEnemyAnimation('');
-          if (result.newHP <= 0) {
-            nextRound();
-          } else {
-            setQuestionStreak(0);
-            newQuestion();
-          }
-        }, 1000);
-      }
-    }, 2000);
   };
 
   const useAbility = () => {
@@ -3281,40 +3327,24 @@ const Calc3PvPGame = () => {
         }
       }, 1200);
     } else {
-      const result = applyDamage(20, true);
+      // Wrong answer: take penalty damage, then enemy attacks
+      const penaltyResult = applyDamage(20, true);
       setCombo(0);
       setQuestionStreak(0);
       setFeedback(`✗ Wrong! Answer: ${currentQuestion.a}`);
-      addLog(`You take ${result.actualDamage} damage!`);
+      addLog(`You take ${penaltyResult.actualDamage} penalty damage!`);
       setPlayerAnimation('shake');
       
       setTimeout(() => {
         setPlayerAnimation('');
-        if (result.newHP <= 0) {
+        if (penaltyResult.newHP <= 0) {
           setGameState('defeat');
         } else {
-          newQuestion();
+          // Enemy still gets to attack after wrong answer
+          enemyAttack();
         }
       }, 1500);
     }
-  };
-
-  const nextRound = () => {
-    addLog('Victory!');
-    setRound(r => r + 1);
-    setTimeout(() => {
-      const newMaxEnemy = 100 + (round * 20);
-      setMaxEnemyHP(newMaxEnemy);
-      setEnemyHP(newMaxEnemy);
-      const newMaxPlayer = maxPlayerHP + 25;
-      setMaxPlayerHP(newMaxPlayer);
-      setPlayerHP(Math.min(newMaxPlayer, playerHP + 50));
-      setEnergy(maxEnergy);
-      setShield(0);
-      setQuestionStreak(0);
-      setBattleLog([]);
-      newQuestion();
-    }, 2000);
   };
 
   const startGame = () => {
@@ -3334,6 +3364,7 @@ const Calc3PvPGame = () => {
     setEnergy(3);
     setShield(0);
     setQuestionStreak(0);
+    setEnemyClass(null);
   };
 
   const selectClass = (cls) => {
@@ -3351,7 +3382,25 @@ const Calc3PvPGame = () => {
     setEnergy(3);
     setShield(0);
     setQuestionStreak(0);
+    setEnemyClass(null);
   };
+
+  useEffect(() => {
+    if (gameState === 'playing' && playerClass) {
+      newQuestion();
+    }
+  }, [gameState, playerClass]);
+
+  useEffect(() => {
+    if (gameState === 'playing' && playerClass && currentQuestion) {
+      if (timeLeft > 0 && !selectedAnswer && currentTurn === 'player') {
+        const timer = setTimeout(() => setTimeLeft(t => t - 1), 1000);
+        return () => clearTimeout(timer);
+      } else if (timeLeft === 0 && !selectedAnswer && currentTurn === 'player') {
+        handleTimeout();
+      }
+    }
+  }, [gameState, timeLeft, selectedAnswer, currentTurn, playerClass, currentQuestion]);
 
   if (showClassSelect) {
     return (
@@ -3471,7 +3520,6 @@ const Calc3PvPGame = () => {
 
   return (
     <div className="w-full h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-      {/* Exit Button */}
       <button
         onClick={() => {
           setPlayerClass(null);
@@ -3527,13 +3575,14 @@ const Calc3PvPGame = () => {
         </div>
 
         <div className="text-center">
-          <div className={`w-32 h-32 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center mb-2 ${currentTurn === 'enemy' ? 'ring-4 ring-red-400' : ''} ${enemyAnimation}`}>
-            <Target className="w-16 h-16 text-white" />
+          <div className={`w-32 h-32 bg-gradient-to-br ${enemyClass ? classes[enemyClass].color : 'from-red-500 to-orange-500'} rounded-full flex items-center justify-center mb-2 ${currentTurn === 'enemy' ? 'ring-4 ring-red-400' : ''} ${enemyAnimation}`}>
+            {enemyClass ? React.createElement(classes[enemyClass].icon, { className: 'w-16 h-16 text-white' }) : <Target className="w-16 h-16 text-white" />}
           </div>
           <div className="bg-red-600 h-4 rounded-full w-32 mb-1">
             <div className="bg-red-400 h-full" style={{ width: `${(enemyHP / maxEnemyHP) * 100}%` }} />
           </div>
           <p className="text-white font-bold">ENEMY: {enemyHP}/{maxEnemyHP}</p>
+          {enemyClass && <p className="text-yellow-300 text-xs font-bold">{classes[enemyClass].name}</p>}
           {enemyThinking && <p className="text-yellow-300 text-sm">Thinking...</p>}
           {enemyNextMove && currentTurn === 'player' && (
             <div className="mt-2 bg-black/50 rounded px-3 py-1">
@@ -3592,29 +3641,3 @@ const Calc3PvPGame = () => {
 };
 
 export default Calc3PvPGame;
-
-// import logo from './logo.svg';
-// import './App.css';
-
-// function App() {
-//   return (
-//     <div className="App">
-//       <header className="App-header">
-//         <img src={logo} className="App-logo" alt="logo" />
-//         <p>
-//           Edit <code>src/App.js</code> and save to reload.
-//         </p>
-//         <a
-//           className="App-link"
-//           href="https://reactjs.org"
-//           target="_blank"
-//           rel="noopener noreferrer"
-//         >
-//           Learn React
-//         </a>
-//       </header>
-//     </div>
-//   );
-// }
-
-// export default App;
