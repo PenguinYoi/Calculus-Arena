@@ -51,7 +51,7 @@ const Calc3PvPGame = () => {
       description: 'Time and energy master',
       bonusDamage: 5,
       damageReduction: 1.0,
-      ability: { name: 'Arcane Surge', description: 'Deal 35 damage', cost: 2 }
+      ability: { name: 'Arcane Surge', description: 'Deal 35 damage and gain 1 cost', cost: 2 }
     },
     rogue: {
       name: 'Rogue',
@@ -3468,7 +3468,7 @@ const Calc3PvPGame = () => {
                 <input
                   type="range"
                   min="5"
-                  max="30"
+                  max="60"
                   value={maxTime}
                   onChange={(e) => setMaxTime(parseInt(e.target.value))}
                   className="w-full"
